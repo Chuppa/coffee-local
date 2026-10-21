@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="256" viewBox="0 0 720 256"><rect x="4" y="4" width="248" height="248" rx="62" fill="#edf5fa"/>
+<path d="M166 98h16c24 0 24 41 0 41h-16" fill="none" stroke="#142c42" stroke-width="12"/>
+<path d="M57 90h111v51c0 31-23 49-55 49s-56-18-56-49V90Z" fill="#3979d7"/>
+<path d="M78 110h68" stroke="white" stroke-opacity=".55" stroke-width="7" stroke-linecap="round"/>
+<path d="M89 66c-16-16 15-20 0-36M120 66c-16-16 15-20 0-36M151 66c-16-16 15-20 0-36" fill="none" stroke="#142c42" stroke-width="8" stroke-linecap="round"/>
+<path d="M50 205h92" stroke="#142c42" stroke-width="10" stroke-linecap="round"/>
+<circle cx="166" cy="185" r="40" fill="#3979d7" stroke="#edf5fa" stroke-width="8"/><path d="M145 190v-15l19-16 19 16v25h-13v-15h-12v15h-13v-10" fill="white"/><text x="290" y="122" font-family="Arial,sans-serif" font-size="52" font-weight="700" fill="#142c42">Coffee Local</text><text x="292" y="165" font-family="Arial,sans-serif" font-size="28" fill="#3979d7">HOME ASSISTANT</text></svg>
