@@ -1,0 +1,38 @@
+{
+  "title": "Coffee Local",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Coffee Local Bridge",
+        "description": "Enter the bridge address and the API token from its configuration.",
+        "data": {
+          "url": "Bridge URL",
+          "api_token": "API token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update bridge API token",
+        "data": {
+          "api_token": "API token"
+        }
+      },
+      "reconfigure": {
+        "title": "Update bridge connection",
+        "data": {
+          "url": "Bridge URL",
+          "api_token": "API token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the bridge. Check its address and logs.",
+      "invalid_auth": "The bridge rejected the API token."
+    },
+    "abort": {
+      "already_configured": "This machine is already configured.",
+      "reauth_successful": "Authentication updated.",
+      "wrong_device": "The bridge is configured for a different machine.",
+      "reconfigure_successful": "Bridge connection updated."
+    }
+  }
+}
