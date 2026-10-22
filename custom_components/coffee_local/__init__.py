@@ -4,13 +4,14 @@ import logging
 
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import BridgeClient, BridgeAuthError, BridgeError
 from .const import DOMAIN, CONF_URL, CONF_TOKEN
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH, Platform.BUTTON]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
 
 class CoffeeCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, entry):
@@ -36,6 +37,13 @@ async def async_setup_entry(hass, entry):
     # Bridge offline uses HA's automatic ConfigEntryNotReady retry.
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    # Remove retired entities from earlier releases so updates do not leave a
+    # device page full of unavailable drink buttons and unmapped protocol fields.
+    registry = er.async_get(hass)
+    retired = {entry.unique_id + '_action_name', entry.unique_id + '_is_idle'}
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.domain == 'button' or entity.unique_id in retired:
+            registry.async_remove(entity.entity_id)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

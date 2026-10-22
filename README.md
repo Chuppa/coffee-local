@@ -17,15 +17,27 @@ The managed bridge lives in the private Home Assistant app collection. This
 repository contains only the generic HA integration and its tests, with no
 credentials or installation-specific device data.
 
-## Behaviour
+## Controls and status
 
-Fresh validated status controls availability. Bridge outages recover through HA’s
-coordinator polling. Commands wait for delivery and fail if delivery cannot be
-confirmed. Delivery means handed to the machine, not confirmation of physical
-execution. Check the machine before retrying an ambiguous drink command.
+One Power switch, plus Status, Attachment, Progress, Busy, connection status,
+and water tank / grounds container / milk refrigeration warnings. Status values
+use readable names such as Ready, Standby, Heating up and Milk jug (hot).
+Unmapped protocol values appear as Unknown rather than exposing numeric codes.
+Drink and Stop buttons, the unmapped Action sensor, and the duplicate Idle
+sensor are removed automatically when upgrading from 0.1.0. Existing power and
+status entity IDs and user customisations are retained; the former Accessory
+sensor is now named Attachment (its existing entity ID is retained).
 
-This initial release needs attended testing on the actual machine/firmware.
+Fresh validated status controls availability. Bridge outages recover through
+Home Assistant polling. Power commands wait for delivery and fail if delivery
+cannot be confirmed. Delivery means handed to the machine, rather than
+confirmation of physical execution. Expired commands are discarded.
+
+Update Coffee Local through HACS and restart Home Assistant. Bridge 0.1.4 is
+recommended for reliable command notifications; this update requires no bridge
+configuration changes.
+
 Do not run the old Cremalink bridge and the new bridge against the same machine
-at the same time. New entities have different IDs; update automations deliberately.
+at the same time.
 
 Licensed under AGPL-3.0-or-later; see LICENSE.
