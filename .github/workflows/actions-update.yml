@@ -1,0 +1,24 @@
+name: Merge tested action updates
+on:
+  workflow_run:
+    workflows: [Coffee Local checks and release]
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'dependabot/github_actions/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Merge only tested Dependabot SHA changes on unchanged main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 coffee-tools/merge_actions.py
