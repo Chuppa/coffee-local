@@ -35,12 +35,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 coffee-tools/automatic_release.py prepare
+      - name: Home Assistant integration validation
+        uses: home-assistant/actions/hassfest@cd6f3635a740c84d8a14f6121a90068b8ece6bf6
+      - name: HACS and Marketplace repository validation
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        with:
+          category: integration
+          # Personal custom repository, not a submission to the public catalog.
+          # Keep its README minimal and do not require catalog discovery metadata.
+          ignore: description topics images
+          comment: false
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
         with:
           languages: python,actions
           build-mode: none
       - name: Real Home Assistant lifecycle
         run: python3 coffee-tools/test-ha.py
+      - name: Upcoming Home Assistant and Marketplace compatibility
+        run: python3 coffee-tools/test-ha.py --channel dev
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
         with:
           output: work/codeql
@@ -63,7 +75,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Publish integration version for HACS
+      - name: Publish integration version for HACS and Marketplace
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.check.outputs.version }}
