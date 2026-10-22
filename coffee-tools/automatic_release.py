@@ -122,7 +122,8 @@ def publish():
     release = api(prefix + '/releases/tags/' + tag, missing=True)
     if release is None:
         api(prefix + '/releases', {'tag_name': tag, 'name': 'Coffee Local ' + version,
-            'body': 'Tested Coffee Local HACS integration. Compatible with Coffee Local Bridge API v1. '
+            'body': 'Tested personal Coffee Local integration for HACS and Home Assistant Marketplace. '
+                    'Compatible with Coffee Local Bridge API v1. '
                     'Your Home Assistant update automation can install this release; restart Home Assistant '
                     'when convenient to load it. Bridge and integration version numbers are independent. '
                     'See the README for automatic maintenance and current controls.',
