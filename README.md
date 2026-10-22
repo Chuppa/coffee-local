@@ -17,6 +17,12 @@ The managed bridge lives in the private Home Assistant app collection. This
 repository contains only the generic HA integration and its tests, with no
 credentials or installation-specific device data.
 
+## Versions
+
+Releases use `year.month.release`, such as `2026.10.0`, `2026.10.1`,
+and `2026.11.0`. The last number starts at zero each month. The integration
+and bridge have independent release counters.
+
 ## Controls and status
 
 One Power switch, plus Status, Attachment, Progress, Busy, connection status,
