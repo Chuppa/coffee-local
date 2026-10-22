@@ -1,6 +1,17 @@
 """Run lifecycle tests in a pinned official HA environment, not fabricated stubs."""
 from pathlib import Path
+import json
+import re
 import subprocess
 ROOT = Path(__file__).resolve().parents[1]
-IMAGE = 'ghcr.io/home-assistant/home-assistant:2026.10.2@sha256:33afb0659d786213264c2211f8d91c5fe87461c56eba6a3a546eb05fc71e89f4'
-subprocess.run(['docker', 'run', '--rm', '--entrypoint', 'python', '-v', f'{ROOT}:/repo:ro', IMAGE, '/repo/coffee-tools/ha_lifecycle.py'], check=True)
+SOURCE = 'ghcr.io/home-assistant/home-assistant:stable'
+digest = subprocess.check_output(['docker', 'buildx', 'imagetools', 'inspect', SOURCE,
+                                  '--format', '{{.Manifest.Digest}}'], text=True).strip()
+if not re.fullmatch(r'sha256:[a-f0-9]{64}', digest):
+    raise ValueError('Invalid official stable Home Assistant image digest')
+image = SOURCE + '@' + digest
+(ROOT / 'work').mkdir(exist_ok=True)
+(ROOT / 'work/test-image.json').write_text(json.dumps({'image': image}) + '\n')
+print('Testing the exact official stable Home Assistant image: ' + image, flush=True)
+subprocess.run(['docker', 'run', '--rm', '--pull=always', '--entrypoint', 'python',
+                '-v', f'{ROOT}:/repo:ro', image, '/repo/coffee-tools/ha_lifecycle.py'], check=True)
