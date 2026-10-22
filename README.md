@@ -51,11 +51,42 @@ Home Assistant polling. Power commands wait for delivery and fail if delivery
 cannot be confirmed. Delivery means handed to the machine, rather than
 confirmation of physical execution. Expired commands are discarded.
 
-Update Coffee Local through HACS and restart Home Assistant. Bridge 0.1.4 is
-recommended for reliable command notifications; this update requires no bridge
-configuration changes.
+## Automatic updates and maintenance
+
+Use the latest stable Coffee Local Bridge from your existing app repository.
+Compatibility follows Bridge API v1; bridge and integration release numbers do
+not need to match. No fixed bridge release needs to be maintained in this guide.
+
+Your existing Home Assistant update automation can install Coffee Local through
+its HACS update entity. A Home Assistant restart loads the newly installed
+integration code. Restart timing stays under your control; this integration
+does not restart Home Assistant or install software by itself.
+
+One GitHub workflow runs every six hours to test the current integration against
+the latest official stable Home Assistant image and run CodeQL source-security
+analysis. The test resolves an immutable image digest for each run and retains
+the image record and security reports for seven days. HIGH/CRITICAL findings,
+failed scans or failed lifecycle tests block publication and open a maintenance
+issue. A successful later cycle closes that issue.
+
+Changed integration or release documentation gets an automatic
+`year.month.release` number and a tested stable GitHub release for HACS. An
+unchanged check does not create another version. Interrupted publication retries
+without replacing existing tags. Dependabot checks GitHub Action pins daily;
+only pin changes that pass the checks on current main can merge automatically.
+
+The integration has no extra pip dependencies or its own runtime container.
+Its Python and OS security updates come from Home Assistant; it does not need
+the bridge app's daily precautionary container rebuild. Machine protocol code is
+maintained in the separate bridge. Existing HA update automation and valid HACS
+access are needed for automatic installation; repository checks cannot enable
+device-side update settings or control your chosen restart time.
+
+[HACS update entities](https://www.hacs.dev/docs/use/entities/update/)
+support the standard Home Assistant `update.install` action.
 
 Do not run the old Cremalink bridge and the new bridge against the same machine
 at the same time.
 
-Licensed under AGPL-3.0-or-later; see LICENSE.
+Licensed under AGPL-3.0-or-later; see LICENSE. The two generic CI helpers retain
+their MIT notice in [coffee-tools/LICENSE-MIT.txt](coffee-tools/LICENSE-MIT.txt).
