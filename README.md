@@ -88,4 +88,5 @@ support the standard Home Assistant `update.install` action.
 Do not run the old Cremalink bridge and the new bridge against the same machine
 at the same time.
 
-Licensed under AGPL-3.0-or-later; see LICENSE.
+Licensed under AGPL-3.0-or-later; see LICENSE. The two generic CI helpers retain
+their MIT notice in [coffee-tools/LICENSE-MIT.txt](coffee-tools/LICENSE-MIT.txt).
