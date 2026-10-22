@@ -1,9 +1,12 @@
 """Publish only a tested integration version; never overwrite a tag."""
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 version = json.loads(Path('custom_components/coffee_local/manifest.json').read_text())['version']
+if not re.fullmatch(r'20\d{2}\.(?:[1-9]|1[0-2])\.\d+', version):
+    raise ValueError('Use year.month.release version numbering')
 repo, sha = os.environ['REPOSITORY'], os.environ['SOURCE_SHA']
 tag = 'v' + version
 result = subprocess.run(['gh','api',f'repos/{repo}/git/ref/tags/{tag}'],text=True,capture_output=True)
