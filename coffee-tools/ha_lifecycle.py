@@ -3,6 +3,7 @@ import asyncio
 import json
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 
 from aiohttp import web
@@ -128,28 +129,42 @@ async def main():
                 assert diagnostics['alarm_readings_trusted'] is False
                 for secret in ('x' * 32, 'DO-NOT-EXPORT', 'SIMULATOR'):
                     assert secret not in json.dumps(diagnostics)
-            finally:
-                await hass.async_stop(force=True)
-            # New HA instance, same disk storage: last awake readings survive a
-            # full restart, even when only contradictory standby data is received.
-            hass = await start_hass(directory)
-            try:
-                entry = hass.config_entries.async_entries('coffee_local')[0]
-                await hass.async_block_till_done()
-                assert hass.states.get('switch.coffee_machine_power').state == 'off'
-                assert hass.states.get(ids['is_watertank_empty']).state == 'off'
-                assert hass.states.get(ids['is_waste_container_full']).state == 'on'
-                # A new awake report replaces both cached values.
+                # A fresh awake report replaces cached values.
                 payload['fields'].update(status_code=7, status_name='ready')
                 await entry.runtime_data.async_refresh()
                 assert hass.states.get(ids['is_watertank_empty']).state == 'on'
                 assert hass.states.get(ids['is_waste_container_full']).state == 'off'
-                assert await hass.config_entries.async_unload(entry.entry_id)
-                print(f'HA {__version__}: 7 basic entities, migration, standby cache, full restart, '
-                      'fresh reports, identity guard, outage/recovery and redacted diagnostics passed')
+                payload['fields'].update(is_watertank_empty=False, is_waste_container_full=True)
+                await entry.runtime_data.async_refresh()
+                payload['fields'].update(status_code=0, status_name='in_standby',
+                                         is_watertank_empty=True, is_waste_container_full=False)
+                await entry.runtime_data.async_refresh()
             finally:
                 await hass.async_stop(force=True)
+            # A restart is a fresh OS process, not a second HA instance sharing
+            # native libraries and process-global resources in one interpreter.
+            child = await asyncio.create_subprocess_exec(
+                sys.executable, __file__, '--restore', directory,
+                ids['is_watertank_empty'], ids['is_waste_container_full'])
+            assert await child.wait() == 0, 'Fresh-process restore check failed'
+            print(f'HA {__version__}: 7 basic entities, migration, standby cache, full restart, '
+                  'fresh reports, identity guard, outage/recovery and redacted diagnostics passed')
     finally:
         await runner.cleanup()
 
-asyncio.run(main())
+async def check_restored(directory, water_id, grounds_id):
+    hass = await start_hass(directory)
+    try:
+        assert hass.states.get('switch.coffee_machine_power').state == 'off'
+        assert hass.states.get(water_id).state == 'off'
+        assert hass.states.get(grounds_id).state == 'on'
+        entry = hass.config_entries.async_entries('coffee_local')[0]
+        assert await hass.config_entries.async_unload(entry.entry_id)
+    finally:
+        await hass.async_stop(force=True)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '--restore':
+        asyncio.run(check_restored(*sys.argv[2:]))
+    else:
+        asyncio.run(main())
