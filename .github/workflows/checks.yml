@@ -5,31 +5,82 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '49 */6 * * *'
 permissions:
   contents: read
+concurrency:
+  group: coffee-local-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    outputs:
+      publish: ${{ steps.prepare.outputs.publish }}
+      version: ${{ steps.prepare.outputs.version }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Test automatic release and security gates
+        run: python3 -m unittest discover -s tests -v
+      - name: Prepare a version only for changed integration/release content
+        id: prepare
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 coffee-tools/automatic_release.py prepare
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
+        with:
+          languages: python,actions
+          build-mode: none
       - name: Real Home Assistant lifecycle
         run: python3 coffee-tools/test-ha.py
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
+        with:
+          output: work/codeql
+      - name: Block HIGH and CRITICAL source vulnerabilities
+        run: python3 coffee-tools/security_gate.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: coffee-local-maintenance-evidence
+          path: work/
+          retention-days: 7
   release:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.check.outputs.publish == 'true'
     needs: check
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Publish integration version for HACS
         env:
           GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          SOURCE_SHA: ${{ github.sha }}
-        run: python3 coffee-tools/release.py
+          RELEASE_VERSION: ${{ needs.check.outputs.version }}
+        run: python3 coffee-tools/automatic_release.py publish
+  report:
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [check, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: python3 coffee-tools/report.py
