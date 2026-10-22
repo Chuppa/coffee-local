@@ -2,12 +2,25 @@ from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySen
 from homeassistant.const import EntityCategory
 from .entity import CoffeeEntity
 
+FLAG_NAMES = {
+    'is_busy': 'Busy',
+    'is_watertank_empty': 'Water tank empty',
+    'is_watertank_open': 'Water tank open',
+    'is_waste_container_full': 'Grounds container full',
+    'is_waste_container_missing': 'Grounds container missing',
+    'is_milk_fridge_warning': 'Milk refrigeration warning',
+}
+
 async def async_setup_entry(hass, entry, async_add_entities):
     c = entry.runtime_data
-    async_add_entities([CoffeeFlag(c, key, key.removeprefix('is_').replace('_', ' ').capitalize())
-                        for key in c.data['binary_fields']] + [CoffeeConnection(c, 'connected', 'Connected')])
+    async_add_entities([CoffeeFlag(c, key, FLAG_NAMES[key])
+                        for key in c.data['binary_fields'] if key in FLAG_NAMES] + [CoffeeConnection(c, 'connected', 'Connected')])
 
 class CoffeeFlag(CoffeeEntity, BinarySensorEntity):
+    @property
+    def device_class(self):
+        return BinarySensorDeviceClass.RUNNING if self.key == 'is_busy' else BinarySensorDeviceClass.PROBLEM
+
     @property
     def is_on(self):
         return self.coordinator.data['fields'].get(self.key)

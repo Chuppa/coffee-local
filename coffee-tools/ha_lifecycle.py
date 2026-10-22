@@ -10,6 +10,7 @@ import tempfile
 from aiohttp import web
 from homeassistant import bootstrap, loader
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.const import __version__
 
 ROOT = Path('/repo')
@@ -20,7 +21,7 @@ async def main():
         'device': {'id': 'SIMULATOR', 'model': 'ECAM612'},
         'connection': {'ready': False, 'registered': False, 'keys_ready': False, 'monitor_age_seconds': None, 'last_error': None},
         'fields': {}, 'commands': {'wakeup': 'Turn On', 'standby': 'Turn Off', 'espresso': 'Espresso', 'stop': 'Stop'},
-        'binary_fields': ['is_busy', 'is_watertank_empty'], 'last_command': None,
+        'binary_fields': ['is_busy', 'is_watertank_empty', 'is_idle'], 'last_command': None,
     }
     async def status(request):
         if request.headers.get('Authorization') != 'Bearer ' + 'x' * 32:
@@ -55,19 +56,55 @@ async def main():
             assert entry.runtime_data.data['connection']['ready'] is False
             states = hass.states.async_all()
             coffee_states = [state for state in states if 'coffee_machine' in state.entity_id]
-            assert len(coffee_states) == 10, [(s.entity_id,s.state) for s in states]
+            assert len(coffee_states) == 7, [(s.entity_id,s.state) for s in states]
             assert hass.states.get('binary_sensor.coffee_machine_connected').state == 'off'
             assert hass.states.get('switch.coffee_machine_power').state == 'unavailable'
             payload['connection']['ready'] = True
-            payload['fields'] = {'status_code': 7, 'status_name': 'ready', 'is_busy': False, 'is_watertank_empty': False, 'progress_percent': 0}
+            payload['fields'] = {'status_code': 7, 'status_name': 'ready', 'is_busy': False, 'is_watertank_empty': False, 'progress_percent': 0, 'accessory_name': 'latte_crema_hot', 'action_name': 'unknown_4', 'is_idle': True}
             await entry.runtime_data.async_refresh()
             await hass.async_block_till_done()
             assert hass.states.get('switch.coffee_machine_power').state == 'on'
-            assert hass.states.get('sensor.coffee_machine_status').state == 'ready'
+            assert hass.states.get('sensor.coffee_machine_status').state == 'Ready'
+            registry = er.async_get(hass)
+            def entity_id(key):
+                return registry.async_get_entity_id('sensor', 'coffee_local', 'SIMULATOR_' + key)
+            attachment_id = entity_id('accessory_name')
+            assert hass.states.get(attachment_id).state == 'Milk jug (hot)'
+            assert registry.async_get(attachment_id).original_name == 'Attachment'
+            water_id = registry.async_get_entity_id('binary_sensor', 'coffee_local', 'SIMULATOR_is_watertank_empty')
+            assert registry.async_get(water_id).original_name == 'Water tank empty'
+            assert hass.states.get(water_id).attributes['device_class'] == 'problem'
+            assert not any(s.domain == 'button' for s in coffee_states)
+            assert entity_id('action_name') is None
+            for raw, expected in [('in_standby', 'Standby'), ('waking_up', 'Heating up'),
+                                  ('cleaning_milk', 'Cleaning milk system'), ('unknown_29', 'Unknown')]:
+                payload['fields']['status_name'] = raw
+                await entry.runtime_data.async_refresh()
+                assert hass.states.get('sensor.coffee_machine_status').state == expected
+            payload['fields']['status_name'] = 'ready'
+            payload['fields']['accessory_name'] = 'unknown_99'
+            await entry.runtime_data.async_refresh()
+            assert hass.states.get(attachment_id).state == 'Unknown'
+            payload['fields']['accessory_name'] = 'none'
+            await entry.runtime_data.async_refresh()
+            assert hass.states.get(attachment_id).state == 'No attachment'
+            # Seed the old registry entries as an upgrade from 0.1.0. Existing
+            # user customisations and kept entity IDs must survive the reload.
+            retired_ids = []
+            for domain, key in [('button', 'espresso'), ('button', 'stop'),
+                                ('sensor', 'action_name'), ('binary_sensor', 'is_idle')]:
+                old = registry.async_get_or_create(domain, 'coffee_local', 'SIMULATOR_' + key,
+                                                   config_entry=entry, suggested_object_id='legacy_' + key)
+                retired_ids.append(old.entity_id)
+            registry.async_update_entity('switch.coffee_machine_power', name='Kitchen coffee power')
             # Reload HA entry against an existing bridge; it issues no configure request.
             assert await hass.config_entries.async_reload(entry.entry_id)
             await hass.async_block_till_done()
             assert hass.states.get('switch.coffee_machine_power').state == 'on'
+            assert all(registry.async_get(eid) is None for eid in retired_ids)
+            assert registry.async_get('switch.coffee_machine_power').name == 'Kitchen coffee power'
+            assert entity_id('accessory_name') == attachment_id
+            assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 7
             # A bridge outage must mark entities unavailable and recover on refresh.
             bridge_url = entry.runtime_data.client.url
             entry.runtime_data.client.url = "http://127.0.0.1:1"
@@ -96,7 +133,7 @@ async def main():
             assert json.loads((Path(directory) / 'custom_components/coffee_local/manifest.json').read_text())['requirements'] == []
             assert await hass.config_entries.async_unload(entry.entry_id)
             await hass.async_block_till_done()
-            print(f'HA {__version__}: real config flow, 10 entities, offline→online, reload, identity guard, recovery, diagnostics and unload passed')
+            print(f'HA {__version__}: real config flow, 7 entities, readable states, upgrade cleanup, offline→online, reload, identity guard, recovery, diagnostics and unload passed')
         finally:
             await hass.async_stop(force=True)
             await runner.cleanup()
