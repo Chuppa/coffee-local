@@ -40,7 +40,9 @@ async def async_setup_entry(hass, entry):
     # Remove retired entities from earlier releases so updates do not leave a
     # device page full of unavailable drink buttons and unmapped protocol fields.
     registry = er.async_get(hass)
-    retired = {entry.unique_id + '_action_name', entry.unique_id + '_is_idle'}
+    retired = {entry.unique_id + '_' + key for key in (
+        'action_name', 'is_idle', 'accessory_name', 'progress_percent',
+        'is_busy', 'is_milk_fridge_warning')}
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         if entity.domain == 'button' or entity.unique_id in retired:
             registry.async_remove(entity.entity_id)
