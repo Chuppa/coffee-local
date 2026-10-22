@@ -136,6 +136,10 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(security.blocking(self.report('7.0')), 1)
         self.assertEqual(security.blocking(self.report('9.8')), 1)
 
+    def test_malformed_analysis_cannot_pass_as_zero_findings(self):
+        with self.assertRaisesRegex(ValueError, 'Missing CodeQL'):
+            security.blocking({})
+
     def test_medium_findings_stay_in_reports_without_bypassing_high_gate(self):
         self.assertEqual(security.blocking(self.report('6.9')), 0)
 

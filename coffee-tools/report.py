@@ -1,3 +1,4 @@
+# MIT-licensed helper; copyright and permission notice in LICENSE-MIT.txt.
 """Keep one actionable maintenance issue; close it after the next successful run."""
 import json
 import os

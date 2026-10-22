@@ -1,3 +1,4 @@
+# MIT-licensed helper; copyright and permission notice in LICENSE-MIT.txt.
 """Merge only tested Dependabot action-pin changes; never execute the PR's code here."""
 from collections import Counter
 import json

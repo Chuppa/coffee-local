@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 def blocking(report):
+    if not isinstance(report.get('runs'), list) or not report['runs']:
+        raise ValueError('Missing CodeQL analysis runs; refusing release')
     count = 0
     for run in report.get('runs', []):
         rules = {rule['id']: rule for rule in run['tool']['driver'].get('rules', [])}
