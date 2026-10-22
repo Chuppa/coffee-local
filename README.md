@@ -25,14 +25,26 @@ and bridge have independent release counters.
 
 ## Controls and status
 
-One Power switch, plus Status, Attachment, Progress, Busy, connection status,
-and water tank / grounds container / milk refrigeration warnings. Status values
-use readable names such as Ready, Standby, Heating up and Milk jug (hot).
-Unmapped protocol values appear as Unknown rather than exposing numeric codes.
-Drink and Stop buttons, the unmapped Action sensor, and the duplicate Idle
-sensor are removed automatically when upgrading from 0.1.0. Existing power and
-status entity IDs and user customisations are retained; the former Accessory
-sensor is now named Attachment (its existing entity ID is retained).
+Power switch, main machine Status, and water/grounds alerts:
+
+- Water tank empty
+- Water tank missing
+- Grounds container full
+- Grounds container missing
+
+Connection status stays in the diagnostics section. Drink/Stop buttons,
+Attachment, Action, Busy, Progress, Idle, and the unsupported milk refrigeration
+warning are removed automatically during upgrade. Existing power, status and
+water/grounds entity IDs and custom names are preserved.
+
+On the PrimaDonna Soul, alarm/accessory values observed in standby contradict
+physical conditions. Water/grounds alerts retain their last reported awake readings in standby,
+including across Home Assistant restarts. Fresh awake reports replace the cached
+readings. A sensor with no previous reading stays unavailable until its first
+awake report; no OK/Problem value is invented. The alarm
+mappings still require validation on the actual machine. Downloadable diagnostics
+include whitelisted decoded fields and monitor bytes for this verification,
+without credentials or device identifiers.
 
 Fresh validated status controls availability. Bridge outages recover through
 Home Assistant polling. Power commands wait for delivery and fail if delivery
