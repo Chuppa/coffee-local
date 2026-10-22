@@ -27,6 +27,18 @@ async def start_hass(directory):
     return hass
 
 async def main():
+    # Use Marketplace's actual post-install validator when present in core.
+    # Stable HA before 2026.11 continues to be tested through the loader below.
+    from importlib.util import find_spec
+    if find_spec('homeassistant.components.marketplace') is not None:
+        from homeassistant.components.marketplace.repositories.integration import (
+            _check_loadable_manifest, _validated_domain,
+        )
+        manifest = json.loads((ROOT / 'custom_components/coffee_local/manifest.json').read_text())
+        assert _validated_domain(manifest['domain']) == 'coffee_local'
+        assert not (Path(loader.__file__).parent / 'components/coffee_local').exists()
+        _check_loadable_manifest(ROOT / 'custom_components/coffee_local', 'coffee_local')
+        print(f'HA {__version__}: built-in Marketplace manifest/domain checks passed', flush=True)
     payload = {
         'api_version': 1, 'bridge_version': '2026.10.1',
         'device': {'id': 'SIMULATOR', 'model': 'ECAM612'},
