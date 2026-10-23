@@ -90,6 +90,35 @@ def scope(prefix, commit):
     return result
 
 
+def commit_notes(prefix, tag, generated):
+    repo = os.environ['GITHUB_REPOSITORY']
+    pattern = re.escape('https://github.com/' + repo + '/compare/') + r'(v20\d{2}\.\d+\.\d+)\.\.\.' + re.escape(tag) + r'(?=\s|$)'
+    match = re.search(pattern, generated)
+    if not match:
+        return generated
+    changes = api(prefix + '/compare/' + match[1] + '...' + tag)
+    entries, prs = [], []
+    for commit in changes.get('commits', []):
+        message = commit['commit']['message']
+        title = message.splitlines()[0]
+        merge = re.match(r'Merge pull request #(\d+)\b', title)
+        if merge:
+            prs.append('[#' + merge[1] + '](https://github.com/' + repo + '/pull/' + merge[1] + ')')
+            continue
+        if re.match(r'Release Coffee Local 20\d{2}\.', title) or 'one-time README history cleanup' in title:
+            continue
+        sha = commit['sha']
+        if not re.fullmatch('[a-f0-9]{40}', sha):
+            raise ValueError('Invalid source commit identity')
+        author = (commit.get('author') or {}).get('login')
+        attribution = ' @' + author if author and re.fullmatch(r'[\w\[\]-]+', author) else ''
+        entries.append('- ' + title + attribution + ' ([' + sha[:7] + '](https://github.com/' + repo + '/commit/' + sha + '))')
+    if not entries:
+        return generated
+    extra = '\n\nRelated pull requests: ' + ', '.join(dict.fromkeys(prs)) if prs else ''
+    return '\n'.join(entries) + extra + '\n\n' + generated
+
+
 def release_notes(prefix, tag, sha, allow_fallback=True):
     latest = api(prefix + '/releases/latest', missing=True)
     previous = latest.get('tag_name') if latest else None
@@ -102,6 +131,12 @@ def release_notes(prefix, tag, sha, allow_fallback=True):
         generated = ''
     if generated.strip():
         generated = re.sub(r"^## What[’']s [Cc]hanged\s*", '', generated)
+        if not re.search(r'^[*-] ', generated, flags=re.M):
+            try:
+                generated = commit_notes(prefix, tag, generated)
+            except RuntimeError:
+                if not allow_fallback:
+                    return None
         return format_notes(generated)
     if not allow_fallback:
         return None
