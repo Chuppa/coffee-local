@@ -80,9 +80,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.check.outputs.version }}
         run: python3 coffee-tools/automatic_release.py publish
+  notes:
+    if: always() && needs.check.result == 'success' && needs.release.result != 'failure' && needs.release.result != 'cancelled' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [check, release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Keep published integration notes aligned with tested changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 coffee-tools/automatic_release.py notes
   report:
     if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [check, release]
+    needs: [check, release, notes]
     runs-on: ubuntu-24.04
     permissions:
       contents: read

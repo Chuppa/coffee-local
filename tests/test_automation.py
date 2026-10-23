@@ -134,6 +134,26 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('/tree/'+'a'*40,notes)
         self.assertNotIn('Dependency updates',notes)
 
+    def test_current_notes_sync_only_patches_release_body(self):
+        calls=[]
+        def api(path,data=None,**kwargs):
+            calls.append((path,data,kwargs))
+            if path.endswith('/latest'):return {'id':42,'tag_name':'v2026.10.1','body':'Old'}
+            if path.endswith('/generate-notes'):return {'body':"## What's Changed\n* Update dependency to v2.0 by @bot in https://github.com/example/app/pull/42"}
+            return {}
+        with patch.object(release,'api',side_effect=api):release.sync_notes()
+        edits=[(path,data,kwargs) for path,data,kwargs in calls if kwargs.get('method')=='PATCH']
+        self.assertEqual(len(edits),1)
+        self.assertEqual(edits[0][0],'repos/Chuppa/coffee-local/releases/42')
+        self.assertEqual(set(edits[0][1]),{'body'})
+        self.assertIn('Dependency updates',edits[0][1]['body'])
+
+    def test_notes_sync_preserves_existing_description_on_optional_service_failure(self):
+        with patch.object(release,'api',side_effect=[{'id':42,'tag_name':'v2026.10.1'},
+                          {'tag_name':'v2026.10.1'},RuntimeError('unavailable')]) as api:
+            release.sync_notes()
+        self.assertEqual(api.call_count,3)
+
     def test_same_version_different_content_cannot_replace_a_tag(self):
         def api(path, data=None, **kwargs):
             return {'object': {'type': 'commit', 'sha': ('a' if path.endswith('/main') else 'b') * 40}}
