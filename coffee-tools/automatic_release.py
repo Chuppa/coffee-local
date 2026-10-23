@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from release_notes import format_notes
 from zoneinfo import ZoneInfo
 
 MANIFEST = 'custom_components/coffee_local/manifest.json'
@@ -31,10 +34,10 @@ def command(*args):
     return subprocess.check_output(args, text=True).strip()
 
 
-def api(path, data=None, missing=False):
+def api(path, data=None, missing=False, method=None):
     args = ['gh', 'api', path]
     if data is not None:
-        args += ['--method', 'POST', '--input', '-']
+        args += ['--method', method or 'POST', '--input', '-']
     result = subprocess.run(args, input=json.dumps(data) if data is not None else None,
                             text=True, capture_output=True)
     if result.returncode:
@@ -87,6 +90,41 @@ def scope(prefix, commit):
     return result
 
 
+def release_notes(prefix, tag, sha, allow_fallback=True):
+    latest = api(prefix + '/releases/latest', missing=True)
+    previous = latest.get('tag_name') if latest else None
+    data = {'tag_name': tag, 'target_commitish': sha}
+    if previous and previous != tag:
+        data['previous_tag_name'] = previous
+    try:
+        generated = api(prefix + '/releases/generate-notes', data).get('body', '')
+    except RuntimeError:
+        generated = ''
+    if generated.strip():
+        generated = re.sub(r"^## What[’']s [Cc]hanged\s*", '', generated)
+        return format_notes(generated)
+    if not allow_fallback:
+        return None
+    # Keep publication working if GitHub's optional notes service is unavailable.
+    url = 'https://github.com/' + os.environ['GITHUB_REPOSITORY']
+    url += '/compare/' + previous + '...' + tag if previous and previous != tag else '/tree/' + sha
+    return format_notes('- See the [tested source changes](' + url + ').')
+
+
+def sync_notes():
+    prefix = 'repos/' + os.environ['GITHUB_REPOSITORY']
+    latest = api(prefix + '/releases/latest', missing=True)
+    if not latest:
+        return
+    body = release_notes(prefix, latest['tag_name'], latest['tag_name'], allow_fallback=False)
+    if not body:
+        print('Notes service unavailable; keeping the existing release description')
+        return
+    if latest.get('body', '').strip() != body.strip():
+        api(prefix + '/releases/' + str(latest['id']), {'body': body}, method='PATCH')
+    print('Release notes current: ' + latest['tag_name'])
+
+
 def publish():
     repo = os.environ['GITHUB_REPOSITORY']
     base = os.environ['GITHUB_SHA']
@@ -122,17 +160,13 @@ def publish():
     release = api(prefix + '/releases/tags/' + tag, missing=True)
     if release is None:
         api(prefix + '/releases', {'tag_name': tag, 'name': 'Coffee Local ' + version,
-            'body': 'Tested personal Coffee Local integration for HACS and Home Assistant Marketplace. '
-                    'Compatible with Coffee Local Bridge API v1. '
-                    'Your Home Assistant update automation can install this release; restart Home Assistant '
-                    'when convenient to load it. Bridge and integration version numbers are independent. '
-                    'See the README for automatic maintenance and current controls.',
+            'body': release_notes(prefix, tag, sha),
             'draft': False, 'prerelease': False})
     print('Published ' + tag + ' from tested source ' + sha)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('operation', choices=('prepare', 'publish'))
+    parser.add_argument('operation', choices=('prepare', 'publish', 'notes'))
     operation = parser.parse_args().operation
-    prepare() if operation == 'prepare' else publish()
+    {'prepare': prepare, 'publish': publish, 'notes': sync_notes}[operation]()
