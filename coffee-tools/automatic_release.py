@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from release_notes import format_notes
 from zoneinfo import ZoneInfo
 
 MANIFEST = 'custom_components/coffee_local/manifest.json'
@@ -87,6 +90,25 @@ def scope(prefix, commit):
     return result
 
 
+def release_notes(prefix, tag, sha):
+    latest = api(prefix + '/releases/latest', missing=True)
+    previous = latest.get('tag_name') if latest else None
+    data = {'tag_name': tag, 'target_commitish': sha}
+    if previous and previous != tag:
+        data['previous_tag_name'] = previous
+    try:
+        generated = api(prefix + '/releases/generate-notes', data).get('body', '')
+    except RuntimeError:
+        generated = ''
+    if generated.strip():
+        generated = re.sub(r"^## What[’']s [Cc]hanged\s*", '', generated)
+        return format_notes(generated)
+    # Keep publication working if GitHub's optional notes service is unavailable.
+    url = 'https://github.com/' + os.environ['GITHUB_REPOSITORY']
+    url += '/compare/' + previous + '...' + tag if previous and previous != tag else '/tree/' + sha
+    return format_notes('- See the [tested source changes](' + url + ').')
+
+
 def publish():
     repo = os.environ['GITHUB_REPOSITORY']
     base = os.environ['GITHUB_SHA']
@@ -122,11 +144,7 @@ def publish():
     release = api(prefix + '/releases/tags/' + tag, missing=True)
     if release is None:
         api(prefix + '/releases', {'tag_name': tag, 'name': 'Coffee Local ' + version,
-            'body': 'Tested personal Coffee Local integration for HACS and Home Assistant Marketplace. '
-                    'Compatible with Coffee Local Bridge API v1. '
-                    'Your Home Assistant update automation can install this release; restart Home Assistant '
-                    'when convenient to load it. Bridge and integration version numbers are independent. '
-                    'See the README for automatic maintenance and current controls.',
+            'body': release_notes(prefix, tag, sha),
             'draft': False, 'prerelease': False})
     print('Published ' + tag + ' from tested source ' + sha)
 

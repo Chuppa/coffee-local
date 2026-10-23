@@ -115,7 +115,24 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(release, 'api', side_effect=api):
             release.publish()
         self.assertEqual([path for path, data in calls if data is not None],
-                         ['repos/Chuppa/coffee-local/releases'])
+                         ['repos/Chuppa/coffee-local/releases/generate-notes', 'repos/Chuppa/coffee-local/releases'])
+
+    def test_release_notes_keep_real_dependency_pr_versions_and_author(self):
+        def api(path,data=None,**kwargs):
+            if path.endswith('/latest'):return {'tag_name':'v2026.10.1'}
+            self.assertEqual(data['previous_tag_name'],'v2026.10.1')
+            return {'body':"## What's Changed\n* Update aiohttp to v3.14.2 by @bot in https://github.com/example/app/pull/42"}
+        with patch.object(release,'api',side_effect=api):
+            notes=release.release_notes('repos/example/app','v2026.10.2','a'*40)
+        self.assertIn('## ⬆️ Dependency updates',notes)
+        self.assertIn('v3.14.2 by @bot',notes)
+        self.assertIn('/pull/42',notes)
+
+    def test_notes_service_failure_does_not_block_release_or_invent_details(self):
+        with patch.object(release,'api',side_effect=[None,RuntimeError('unavailable')]):
+            notes=release.release_notes('repos/example/app','v2026.10.2','a'*40)
+        self.assertIn('/tree/'+'a'*40,notes)
+        self.assertNotIn('Dependency updates',notes)
 
     def test_same_version_different_content_cannot_replace_a_tag(self):
         def api(path, data=None, **kwargs):
