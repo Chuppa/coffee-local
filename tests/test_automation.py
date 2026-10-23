@@ -134,6 +134,21 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('/tree/'+'a'*40,notes)
         self.assertNotIn('Dependency updates',notes)
 
+    def test_rewritten_history_uses_actual_commits_when_github_omits_pr_bullets(self):
+        generated='**Full Changelog**: https://github.com/Chuppa/coffee-local/compare/v2026.10.1...v2026.10.2'
+        def commit(message,letter):
+            return {'sha':letter*40,'commit':{'message':message},'author':{'login':'Chuppa'}}
+        commits=[commit('Fix Home Assistant connection text','b'),
+                 commit('Merge pull request #2 from Chuppa/test','c'),
+                 commit('Release Coffee Local 2026.10.2','d')]
+        with patch.object(release,'api',return_value={'commits':commits}) as api:
+            notes=release.commit_notes('repos/Chuppa/coffee-local','v2026.10.2',generated)
+        self.assertIn('Fix Home Assistant connection text @Chuppa',notes)
+        self.assertIn('/commit/'+'b'*40,notes)
+        self.assertIn('/pull/2',notes)
+        self.assertNotIn('Release Coffee Local',notes)
+        api.assert_called_once_with('repos/Chuppa/coffee-local/compare/v2026.10.1...v2026.10.2')
+
     def test_current_notes_sync_only_patches_release_body(self):
         calls=[]
         def api(path,data=None,**kwargs):
