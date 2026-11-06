@@ -46,7 +46,7 @@ jobs:
           # Keep its README minimal and do not require catalog discovery metadata.
           ignore: description topics images
           comment: false
-      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
+      - uses: github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26
         with:
           languages: python,actions
           build-mode: none
@@ -54,7 +54,7 @@ jobs:
         run: python3 coffee-tools/test-ha.py
       - name: Upcoming Home Assistant and Marketplace compatibility
         run: python3 coffee-tools/test-ha.py --channel dev
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
+      - uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26
         with:
           output: work/codeql
       - name: Block HIGH and CRITICAL source vulnerabilities
