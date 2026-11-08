@@ -19,9 +19,11 @@ class CoffeeEntity(CoordinatorEntity):
 
     @property
     def available(self):
-        return super().available and self.coordinator.data['connection']['ready']
+        return super().available and self.coordinator.display_available
 
     async def send(self, command):
+        if not self.coordinator.last_update_success or not self.coordinator.data['connection']['ready']:
+            raise HomeAssistantError('Machine is reconnecting; try again when connected')
         try:
             await self.coordinator.client.command(command)
         except BridgeError as exc:

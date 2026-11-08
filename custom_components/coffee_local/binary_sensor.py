@@ -26,6 +26,8 @@ class CoffeeFlag(CoffeeEntity, RestoreEntity, BinarySensorEntity):
         self._capture_reported_value()
 
     def _capture_reported_value(self):
+        if not self.coordinator.data['connection']['ready']:
+            return
         fields = self.coordinator.data['fields']
         # Standby payloads on PrimaDonna Soul can contradict physical conditions.
         # Keep the last awake reading instead of treating standby bits as alarms.

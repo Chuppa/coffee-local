@@ -7,6 +7,9 @@ from aiohttp import ClientError, ClientTimeout
 class BridgeError(Exception):
     pass
 
+class BridgeConnectionError(BridgeError):
+    pass
+
 class BridgeAuthError(BridgeError):
     pass
 
@@ -48,8 +51,10 @@ class BridgeClient:
                 if response.status >= 300:
                     raise BridgeError(f'Bridge returned HTTP {response.status}; command not confirmed')
                 return await response.json()
-        except (ClientError, asyncio.TimeoutError, ValueError) as exc:
-            raise BridgeError('Cannot communicate with coffee bridge') from exc
+        except (ClientError, asyncio.TimeoutError) as exc:
+            raise BridgeConnectionError('Cannot communicate with coffee bridge') from exc
+        except ValueError as exc:
+            raise BridgeError('Invalid coffee bridge response') from exc
 
     async def status(self):
         return validate_snapshot(await self.request('GET', '/api/v1/status'))

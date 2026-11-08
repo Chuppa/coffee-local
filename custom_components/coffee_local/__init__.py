@@ -1,6 +1,8 @@
 """Coffee Local integration: HA owns HTTP polling; the bridge owns the machine."""
 from datetime import timedelta
 import logging
+import time
+from copy import deepcopy
 
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -8,7 +10,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import BridgeClient, BridgeAuthError, BridgeError
+from .api import BridgeClient, BridgeAuthError, BridgeError, BridgeConnectionError
 from .const import DOMAIN, CONF_URL, CONF_TOKEN
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
@@ -19,17 +21,41 @@ class CoffeeCoordinator(DataUpdateCoordinator):
                          config_entry=entry, update_interval=timedelta(seconds=5))
         self.client = BridgeClient(async_get_clientsession(hass), entry.data[CONF_URL], entry.data[CONF_TOKEN])
         self.device_id = entry.unique_id
+        self._clock = time.monotonic
+        self._last_ready = None
+        self._good_data = None
+
+    @property
+    def display_available(self):
+        return self._last_ready is not None and self._clock() - self._last_ready <= 90
+
+    def _last_readings(self, connection):
+        cached = deepcopy(self._good_data)
+        cached['connection'] = connection
+        return cached
 
     async def _async_update_data(self):
         try:
             data = await self.client.status()
-            if data['device']['id'] != self.device_id:
-                raise BridgeError('Bridge device changed; configure the new machine separately')
-            return data
         except BridgeAuthError as exc:
+            self._last_ready = None
             raise ConfigEntryAuthFailed(str(exc)) from exc
-        except BridgeError as exc:
+        except BridgeConnectionError as exc:
+            if self.display_available:
+                return self._last_readings({'ready': False, 'last_error': str(exc)})
             raise UpdateFailed(str(exc)) from exc
+        except BridgeError as exc:
+            self._last_ready = None
+            raise UpdateFailed(str(exc)) from exc
+        if data['device']['id'] != self.device_id:
+            self._last_ready = None
+            raise UpdateFailed('Bridge device changed; configure the new machine separately')
+        if data['connection']['ready']:
+            self._last_ready = self._clock()
+            self._good_data = deepcopy(data)
+        elif self.display_available:
+            return self._last_readings(data['connection'])
+        return data
 
 async def async_setup_entry(hass, entry):
     coordinator = CoffeeCoordinator(hass, entry)

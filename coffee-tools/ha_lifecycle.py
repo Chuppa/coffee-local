@@ -122,12 +122,37 @@ async def main():
                 assert registry.async_get('switch.coffee_machine_power').name == 'Kitchen coffee power'
                 assert hass.states.get(ids['is_watertank_empty']).state == 'off'
                 assert hass.states.get(ids['is_waste_container_full']).state == 'on'
-                # Bridge outage/recovery and identity guard remain intact.
+                # A bounded grace period preserves readings without replaying commands.
+                clock = [0.0]
+                entry.runtime_data._clock = lambda: clock[0]
+                await entry.runtime_data.async_refresh()
+                payload['connection']['ready'] = False
+                payload['fields']['status_name'] = 'ready'
+                await entry.runtime_data.async_refresh()
+                assert hass.states.get('sensor.coffee_machine_status').state == 'Standby'
+                assert hass.states.get('switch.coffee_machine_power').state == 'off'
+                assert hass.states.get('binary_sensor.coffee_machine_connected').state == 'off'
+                from custom_components.coffee_local.switch import CoffeePower
+                from homeassistant.exceptions import HomeAssistantError
+                try:
+                    await CoffeePower(entry.runtime_data, 'power', 'Power').send('wakeup')
+                except HomeAssistantError:
+                    pass
+                else:
+                    raise AssertionError('Command accepted during cached availability')
                 url = entry.runtime_data.client.url
                 entry.runtime_data.client.url = 'http://127.0.0.1:1'
+                clock[0] = 89
+                await entry.runtime_data.async_refresh()
+                assert hass.states.get('switch.coffee_machine_power').state == 'off'
+                clock[0] = 91
                 await entry.runtime_data.async_refresh()
                 assert hass.states.get('switch.coffee_machine_power').state == 'unavailable'
                 entry.runtime_data.client.url = url
+                await entry.runtime_data.async_refresh()
+                assert hass.states.get('switch.coffee_machine_power').state == 'unavailable'
+                payload['connection']['ready'] = True
+                payload['fields']['status_name'] = 'in_standby'
                 await entry.runtime_data.async_refresh()
                 payload['device']['id'] = 'DIFFERENT'
                 await entry.runtime_data.async_refresh()
