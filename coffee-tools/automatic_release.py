@@ -120,6 +120,11 @@ def commit_notes(prefix, tag, generated):
 
 
 def release_notes(prefix, tag, sha, allow_fallback=True):
+    # Reviewed user-facing notes take precedence over GitHub's PR-only summary.
+    if re.fullmatch(r'v20\d{2}\.\d+\.\d+', tag):
+        reviewed = Path('release-notes') / (tag[1:] + '.md')
+        if reviewed.is_file():
+            return reviewed.read_text().strip()
     latest = api(prefix + '/releases/latest', missing=True)
     previous = latest.get('tag_name') if latest else None
     data = {'tag_name': tag, 'target_commitish': sha}

@@ -60,6 +60,19 @@ class ReleaseTests(unittest.TestCase):
     def test_unchanged_cycle_has_no_release_or_version_bump(self):
         self.assertEqual(self.prepare(), {'publish': 'false', 'version': '2026.10.1'})
 
+    def test_reviewed_notes_replace_generated_summary_and_survive_sync(self):
+        Path('release-notes').mkdir()
+        body = '## Fixed\n\nKeep readings visible during brief reconnects.'
+        Path('release-notes/2026.10.1.md').write_text(body + '\n')
+        latest = {'id': 123, 'tag_name': 'v2026.10.1', 'body': 'Dependency-only summary'}
+        with patch.object(release, 'api', side_effect=[latest, {}]) as api:
+            release.sync_notes()
+        self.assertEqual(api.call_args.args, ('repos/Chuppa/coffee-local/releases/123', {'body': body}))
+        self.assertEqual(api.call_args.kwargs, {'method': 'PATCH'})
+        with patch.object(release, 'api') as api:
+            self.assertEqual(release.release_notes('unused', 'v2026.10.1', 'a' * 40), body)
+            api.assert_not_called()
+
     def test_documentation_change_gets_one_automatic_version(self):
         Path('README.md').write_text('Updated guide\n')
         self.commit()
