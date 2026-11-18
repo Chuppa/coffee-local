@@ -12,7 +12,7 @@ issues=[i for i in issues if i['title']==title]
 failed=os.environ['FAILED']=='true'
 url=os.environ.get('FAILED_RUN_URL') or 'https://github.com/'+repo+'/actions/runs/'+os.environ['GITHUB_RUN_ID']
 if failed:
-    body='An integration compatibility test, source-security check, automatic release or dependency update failed. The last stable HACS release remains available. The next scheduled run will retry.\n\nRun details: '+url
+    body='An integration compatibility test, source-security check, automatic release or dependency update failed. The last stable Marketplace release remains available. The next scheduled run will retry.\n\nRun details: '+url
     if not issues:gh('issue','create','--repo',repo,'--title',title,'--body',body)
     else:gh('issue','edit',str(issues[0]['number']),'--repo',repo,'--body',body)
 else:

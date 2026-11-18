@@ -1,4 +1,4 @@
-"""Calendar-version and publish tested HACS releases without manual version edits."""
+"""Calendar-version and publish tested Marketplace releases without manual version edits."""
 from datetime import datetime
 import argparse
 import json
@@ -76,7 +76,7 @@ def prepare(today=None):
         Path(MANIFEST).write_text(json.dumps(manifest, indent=2) + '\n')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
         output.write(f'publish={str(needed).lower()}\nversion={manifest["version"]}\n')
-    print('HACS release ' + ('required: ' + manifest['version'] if needed else 'already current; no version bump'))
+    print('Marketplace release ' + ('required: ' + manifest['version'] if needed else 'already current; no version bump'))
 
 
 def scope(prefix, commit):
