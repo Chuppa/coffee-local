@@ -59,6 +59,13 @@ class BridgeClient:
     async def status(self):
         return validate_snapshot(await self.request('GET', '/api/v1/status'))
 
+    async def power(self, on, device_id):
+        request_id = str(uuid.uuid4())
+        result = await self.request('POST', '/api/v1/power', {'on': on, 'request_id': request_id, 'device_id': device_id})
+        if not isinstance(result, dict) or result.get('id') != request_id or result.get('on') is not on or result.get('state') not in ('pending', 'confirmed'):
+            raise BridgeError('Bridge returned an invalid power request')
+        return result
+
     async def command(self, alias):
         request_id = str(uuid.uuid4())
         receipt = await self.request('POST', '/api/v1/commands', {'command': alias, 'request_id': request_id})

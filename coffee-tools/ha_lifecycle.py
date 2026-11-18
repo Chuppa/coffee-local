@@ -50,13 +50,25 @@ async def main():
         'binary_fields': ['is_busy', 'is_idle', 'is_watertank_empty', 'is_watertank_open',
                           'is_waste_container_full', 'is_waste_container_missing', 'is_milk_fridge_warning'],
         'last_command': None,
+        'power_control': {'supported': True, 'request': None},
     }
     async def status(request):
         if request.headers.get('Authorization') != 'Bearer ' + 'x' * 32:
             raise web.HTTPUnauthorized()
         return web.json_response(payload)
+    requests = []
+    async def power(request):
+        if request.headers.get('Authorization') != 'Bearer ' + 'x' * 32:
+            raise web.HTTPUnauthorized()
+        body = await request.json()
+        assert body['device_id'] == 'SIMULATOR'
+        requests.append(body)
+        result = {'id': body['request_id'], 'on': body['on'], 'state': 'pending', 'attempts': 0}
+        payload['power_control'] = {'supported': True, 'request': result}
+        return web.json_response(result, status=202)
     bridge = web.Application()
     bridge.router.add_get('/api/v1/status', status)
+    bridge.router.add_post('/api/v1/power', power)
     runner = web.AppRunner(bridge)
     await runner.setup()
     site = web.TCPSite(runner, '127.0.0.1', 0)
@@ -80,13 +92,19 @@ async def main():
                     return registry.async_get_entity_id(domain, 'coffee_local', 'SIMULATOR_' + key)
                 ids = {key: entity_id('binary_sensor', key) for key in payload['binary_fields']}
                 assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 7
-                assert hass.states.get('switch.coffee_machine_power').state == 'unavailable'
+                assert hass.states.get('switch.coffee_machine_power').state == 'unknown'
                 assert hass.states.get('binary_sensor.coffee_machine_connected').state == 'off'
                 for removed in ('is_busy', 'is_idle', 'is_milk_fridge_warning'):
                     assert ids[removed] is None
                 assert entity_id('sensor', 'accessory_name') is None
                 assert entity_id('sensor', 'progress_percent') is None
                 assert registry.async_get(ids['is_watertank_open']).original_name == 'Water tank missing'
+                await hass.services.async_call('switch', 'turn_on', {'entity_id': 'switch.coffee_machine_power'}, blocking=True)
+                await entry.runtime_data.async_refresh()
+                assert len(requests) == 1 and requests[0]['on'] is True
+                assert hass.states.get('switch.coffee_machine_power').attributes['retrying'] is True
+                requests.clear()
+                payload['power_control']['request'] = None
                 payload['connection']['ready'] = True
                 payload['fields'] = {'status_code': 7, 'status_name': 'ready', 'is_busy': False,
                                      'is_watertank_empty': False, 'is_watertank_open': False,
@@ -132,6 +150,12 @@ async def main():
                 assert hass.states.get('sensor.coffee_machine_status').state == 'Standby'
                 assert hass.states.get('switch.coffee_machine_power').state == 'off'
                 assert hass.states.get('binary_sensor.coffee_machine_connected').state == 'off'
+                await hass.services.async_call('switch', 'turn_on', {'entity_id': 'switch.coffee_machine_power'}, blocking=True)
+                await entry.runtime_data.async_refresh()
+                assert len(requests) == 1 and requests[0]['on'] is True
+                assert hass.states.get('switch.coffee_machine_power').attributes['retrying'] is True
+                await hass.services.async_call('switch', 'turn_off', {'entity_id': 'switch.coffee_machine_power'}, blocking=True)
+                assert len(requests) == 2 and requests[-1]['on'] is False
                 from custom_components.coffee_local.switch import CoffeePower
                 from homeassistant.exceptions import HomeAssistantError
                 try:
@@ -150,7 +174,8 @@ async def main():
                 assert hass.states.get('switch.coffee_machine_power').state == 'unavailable'
                 entry.runtime_data.client.url = url
                 await entry.runtime_data.async_refresh()
-                assert hass.states.get('switch.coffee_machine_power').state == 'unavailable'
+                assert hass.states.get('switch.coffee_machine_power').state == 'off'
+                assert hass.states.get('sensor.coffee_machine_status').state == 'unavailable'
                 payload['connection']['ready'] = True
                 payload['fields']['status_name'] = 'in_standby'
                 await entry.runtime_data.async_refresh()

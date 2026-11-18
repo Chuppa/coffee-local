@@ -13,6 +13,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
     fields = c.data.get('fields', {})
     monitor = c.data.get('monitor', {})
     return {
+        'power_request': {key: (c.data.get('power_control', {}).get('request') or {}).get(key) for key in ('on', 'state', 'attempts')},
         'bridge_version': c.data.get('bridge_version'),
         'model': c.data['device'].get('model'),
         'connection': c.data['connection'],

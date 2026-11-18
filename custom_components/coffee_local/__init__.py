@@ -29,9 +29,11 @@ class CoffeeCoordinator(DataUpdateCoordinator):
     def display_available(self):
         return self._last_ready is not None and self._clock() - self._last_ready <= 90
 
-    def _last_readings(self, connection):
+    def _last_readings(self, connection, power_control=None):
         cached = deepcopy(self._good_data)
         cached['connection'] = connection
+        if power_control is not None:
+            cached['power_control'] = deepcopy(power_control)
         return cached
 
     async def _async_update_data(self):
@@ -54,7 +56,7 @@ class CoffeeCoordinator(DataUpdateCoordinator):
             self._last_ready = self._clock()
             self._good_data = deepcopy(data)
         elif self.display_available:
-            return self._last_readings(data['connection'])
+            return self._last_readings(data['connection'], data.get('power_control'))
         return data
 
 async def async_setup_entry(hass, entry):
